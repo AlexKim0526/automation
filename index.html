@@ -3,17 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LaundryGo 입고 자동화 프로세스 | LaundryGo 入庫自動化プロセス</title>
+    <title>LaundryGo 공정 레이아웃</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Noto Sans KR', 'Noto Sans JP', sans-serif;
+            font-family: 'Noto Sans KR', sans-serif;
         }
+        .details-card {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .details-card h3 {
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.75rem;
+        }
+        .details-card p {
+            font-size: 0.875rem;
+            color: #4b5563;
+            margin-bottom: 0.25rem;
+        }
+        .details-card .spec {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        /* Diagram Styles */
         .flow-card {
-            min-height: 110px;
+            min-height: 90px;
             width: 100%;
-            max-width: 400px;
+            max-width: 320px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -30,9 +53,9 @@
         }
         .arrow-down {
             width: 2px;
-            height: 3rem;
+            height: 2.5rem;
             background-color: #d1d5db;
-            margin: 0 auto;
+            margin: 0.5rem auto;
             position: relative;
         }
         .arrow-down::after {
@@ -46,14 +69,14 @@
             border-top: 8px solid #d1d5db;
         }
         .decision-diamond {
-            width: 180px;
-            height: 180px;
+            width: 160px;
+            height: 160px;
             display: flex;
             justify-content: center;
             align-items: center;
             text-align: center;
             transform: rotate(45deg);
-            margin: 0 auto;
+            margin: 0.5rem auto;
         }
         .decision-text {
             transform: rotate(-45deg);
@@ -75,106 +98,144 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 p-4 sm:p-8">
-    <div class="max-w-7xl mx-auto bg-white p-6 sm:p-10 rounded-2xl shadow-xl">
-        <div class="text-center mb-12">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">LaundryGo 입고 자동화 프로세스</h1>
-            <h2 class="text-2xl md:text-3xl font-bold text-blue-600 mt-2">LaundryGo 入庫自動化プロセス</h2>
+<body class="bg-gray-100 p-4 sm:p-8 flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-screen-2xl bg-white p-6 sm:p-8 rounded-2xl shadow-2xl border border-gray-200">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">LaundryGo 공정 다이어그램 및 상세 사양</h1>
         </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 w-full h-[70vh] min-h-[600px] rounded-lg overflow-y-auto p-4 border">
+                <div class="flex flex-col items-center w-full space-y-0">
+                    <!-- Step 1 -->
+                    <div class="relative flow-card bg-blue-50 border border-blue-200">
+                        <div class="actor-badge bg-blue-500">작업자</div>
+                        <p class="font-bold text-blue-800">1. 런드렛 오픈 후 의류전달</p>
+                    </div>
+                    <div class="arrow-down"></div>
 
-        <div class="flex flex-col items-center w-full space-y-4">
-            <!-- Step 1 -->
-            <div class="relative flow-card bg-blue-50 border border-blue-200">
-                <div class="actor-badge bg-blue-500">작업자 | 作業員</div>
-                <p class="font-bold text-blue-800">1. 고객 Bag RFID 리딩</p>
-                <p class="text-sm text-blue-600">顧客バッグのRFIDを読み取り</p>
-            </div>
-            <div class="arrow-down"></div>
+                    <!-- Step 2 -->
+                    <div class="relative flow-card bg-blue-50 border border-blue-200">
+                         <div class="actor-badge bg-blue-500">작업자</div>
+                        <p class="font-bold text-blue-800">2. 회원번호 스캔 & 의류 개별로딩</p>
+                    </div>
+                    <div class="arrow-down"></div>
 
-            <!-- Step 2 -->
-            <div class="relative flow-card bg-blue-50 border border-blue-200">
-                 <div class="actor-badge bg-blue-500">작업자 | 作業員</div>
-                <p class="font-bold text-blue-800">2. 의류 컨베이어 한벌씩 로딩</p>
-                <p class="text-sm text-blue-600">衣類をコンベアに一点ずつ投入</p>
-            </div>
-            <div class="arrow-down"></div>
+                    <!-- Step 3 -->
+                    <div class="relative flow-card bg-yellow-50 border border-yellow-200">
+                        <div class="actor-badge bg-gray-500">자동</div>
+                        <p class="font-bold text-yellow-800">3. RFID 리딩</p>
+                    </div>
+                    <div class="arrow-down"></div>
 
-            <!-- Step 3 -->
-            <div class="relative flow-card bg-yellow-50 border border-yellow-200">
-                <div class="actor-badge bg-gray-500">자동 | 自動</div>
-                <p class="font-bold text-yellow-800">3. 개별 의류 RFID 리딩</p>
-                <p class="text-sm text-yellow-600">個別衣類のRFIDを読み取り</p>
-            </div>
-            <div class="arrow-down"></div>
-
-            <!-- Decision -->
-            <div class="relative decision-diamond bg-orange-100 border-2 border-orange-300">
-                <div class="decision-text">
-                    <p class="font-bold text-orange-800 text-lg">RFID 있음?</p>
-                    <p class="text-orange-600">RFID有り?</p>
+                    <!-- Decision -->
+                    <div class="relative decision-diamond bg-orange-100 border-2 border-orange-300">
+                        <div class="decision-text">
+                            <p class="font-bold text-orange-800 text-lg">RFID 있음?</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Branching -->
+                    <div class="w-full max-w-2xl mx-auto">
+                        <div class="relative h-8 mt-4">
+                            <div class="branch-line absolute top-1/2 left-0 w-full"></div>
+                            <div class="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 bg-white px-2">
+                                <span class="text-lg font-bold text-red-600">NO</span>
+                            </div>
+                            <div class="absolute top-1/2 right-1/4 -translate-x-1/2 -translate-y-1/2 bg-white px-2">
+                                <span class="text-lg font-bold text-green-600">YES</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-8 items-start">
+                            <!-- NO Branch -->
+                            <div class="flex flex-col items-center space-y-0">
+                                <div class="arrow-down"></div>
+                                <div class="relative flow-card bg-red-50 border border-red-200 w-full">
+                                    <div class="actor-badge bg-gray-500">자동</div>
+                                    <p class="font-bold text-red-800">7. 바코드 자동부착</p>
+                                </div>
+                                <div class="arrow-down"></div>
+                                <div class="relative flow-card bg-red-50 border border-red-200 w-full">
+                                    <div class="actor-badge bg-gray-500">자동</div>
+                                    <p class="font-bold text-red-800">8. 지정구역 이동 및 대기</p>
+                                </div>
+                                <div class="arrow-down"></div>
+                                <div class="relative flow-card bg-red-50 border border-red-200 w-full">
+                                     <div class="actor-badge bg-blue-500">작업자</div>
+                                    <p class="font-bold text-red-800">9. RFID 삽입</p>
+                                </div>
+                                <div class="w-full text-center mt-4 pt-4 border-t-2 border-dashed border-red-300">
+                                    <p class="text-sm font-bold text-red-700">↑ (3번 공정으로)</p>
+                                </div>
+                            </div>
+                            <!-- YES Branch -->
+                            <div class="flex flex-col items-center space-y-0">
+                                <div class="arrow-down"></div>
+                                <div class="relative flow-card bg-green-50 border border-green-200 w-full">
+                                    <div class="actor-badge bg-blue-500">작업자</div>
+                                    <p class="font-bold text-green-800">4. 의류 펼치기</p>
+                                </div>
+                                <div class="arrow-down"></div>
+                                <div class="relative flow-card bg-green-50 border border-green-200 w-full">
+                                    <div class="actor-badge bg-gray-500">자동</div>
+                                    <p class="font-bold text-green-800">5. 자동 사진 촬영</p>
+                                </div>
+                                <div class="arrow-down"></div>
+                                <div class="relative flow-card bg-green-50 border border-green-200 w-full">
+                                    <div class="actor-badge bg-gray-500">자동</div>
+                                    <p class="font-bold text-green-800">6. 지정 구역에 Drop</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="arrow-down"></div>
-
-            <!-- Branching -->
-            <div class="w-full max-w-4xl mx-auto">
-                <div class="relative h-8">
-                    <div class="branch-line absolute top-1/2 left-0 w-full"></div>
-                    <div class="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 bg-white px-2">
-                        <span class="text-lg font-bold text-red-600">NO</span>
-                    </div>
-                    <div class="absolute top-1/2 right-1/4 -translate-x-1/2 -translate-y-1/2 bg-white px-2">
-                        <span class="text-lg font-bold text-green-600">YES</span>
-                    </div>
+            <div class="lg:col-span-1 h-full overflow-y-auto" style="max-height: 70vh;">
+                <div class="details-card">
+                    <h3>1. 런드렛 오픈 후 의류전달</h3>
+                    <p><span class="spec">시간당 처리량 :</span> 1,200 개</p>
+                    <p><span class="spec">필요 인력/대수 :</span> 1 명</p>
+                    <p><span class="spec">설명 :</span> 고객의 런드렛(세탁 가방)을 열어 의류를 꺼내고 다음 공정으로 전달합니다.</p>
                 </div>
-                <div class="grid grid-cols-2 gap-8 items-start">
-                    <!-- NO Branch -->
-                    <div class="flex flex-col items-center space-y-4">
-                        <div class="relative flow-card bg-red-50 border border-red-200 w-full">
-                            <div class="actor-badge bg-gray-500">자동 | 自動</div>
-                            <p class="font-bold text-red-800">7. 바코드 자동부착</p>
-                            <p class="text-sm text-red-600">バーコード自動付着</p>
-                        </div>
-                        <div class="arrow-down"></div>
-                        <div class="relative flow-card bg-red-50 border border-red-200 w-full">
-                            <div class="actor-badge bg-gray-500">자동 | 自動</div>
-                            <p class="font-bold text-red-800">8. 지정구역 이동 및 대기</p>
-                            <p class="text-sm text-red-600">指定エリアへ移動し待機</p>
-                        </div>
-                        <div class="arrow-down"></div>
-                        <div class="relative flow-card bg-red-50 border border-red-200 w-full">
-                             <div class="actor-badge bg-blue-500">작업자 | 作業員</div>
-                            <p class="font-bold text-red-800">9. RFID 삽입</p>
-                            <p class="text-sm text-red-600">RFID挿入</p>
-                        </div>
-                        <div class="w-full text-center mt-4 pt-4 border-t-2 border-dashed border-red-300">
-                            <p class="text-sm font-bold text-red-700">↑ (3번 공정으로)</p>
-                            <p class="text-xs text-red-500">↑ (3番工程へ)</p>
-                        </div>
-                    </div>
-                    <!-- YES Branch -->
-                    <div class="flex flex-col items-center space-y-4">
-                        <div class="relative flow-card bg-green-50 border border-green-200 w-full">
-                            <div class="actor-badge bg-blue-500">작업자 | 作業員</div>
-                            <p class="font-bold text-green-800">4. 의류 펼치기</p>
-                            <p class="text-sm text-green-600">衣類を広げる</p>
-                        </div>
-                        <div class="arrow-down"></div>
-                        <div class="relative flow-card bg-green-50 border border-green-200 w-full">
-                            <div class="actor-badge bg-gray-500">자동 | 自動</div>
-                            <p class="font-bold text-green-800">5. 자동 사진 촬영</p>
-                            <p class="text-sm text-green-600">自動で写真撮影</p>
-                        </div>
-                        <div class="arrow-down"></div>
-                        <div class="relative flow-card bg-green-50 border border-green-200 w-full">
-                            <div class="actor-badge bg-gray-500">자동 | 自動</div>
-                            <p class="font-bold text-green-800">6. 지정 구역에 Drop</p>
-                            <p class="text-sm text-green-600">指定エリアにドロップ</p>
-                        </div>
-                    </div>
+                <div class="details-card">
+                    <h3>2. 회원번호 스캔 & 의류 개별로딩</h3>
+                    <p><span class="spec">시간당 처리량 :</span> 1,200 개</p>
+                    <p><span class="spec">필요 인력/대수 :</span> 2 명</p>
+                    <p><span class="spec">설명 :</span> 의류에 부착된 회원번호를 스캔하고, 한 벌씩 컨베이어 벨트에 투입합니다.</p>
+                </div>
+                <div class="details-card">
+                    <h3>3. RFID 리딩</h3>
+                    <p><span class="spec">시간당 처리량 :</span> 1,800 개</p>
+                    <p><span class="spec">필요 인력/대수 :</span> 0 대 (자동)</p>
+                    <p><span class="spec">설명 :</span> 컨베이어를 통과하는 개별 의류의 RFID 태그를 게이트에서 자동으로 인식합니다.</p>
+                </div>
+                <div class="details-card">
+                    <h3>4. 의류 펼치기</h3>
+                    <p><span class="spec">시간당 처리량 :</span> 1,000 개</p>
+                    <p><span class="spec">필요 인력/대수 :</span> 1 명</p>
+                    <p><span class="spec">설명 :</span> 자동 촬영을 위해 작업자가 의류의 앞면이 보이도록 평평하게 펼칩니다.</p>
+                </div>
+                <div class="details-card">
+                    <h3>5. 자동 촬영</h3>
+                    <p><span class="spec">시간당 처리량 :</span> 1,800 개</p>
+                    <p><span class="spec">필요 인력/대수 :</span> 0 대 (자동)</p>
+                    <p><span class="spec">설명 :</span> 촬영 부스에서 의류의 전체 모습을 고해상도 카메라로 자동 촬영하여 기록합니다.</p>
+                </div>
+                <div class="details-card">
+                    <h3>6. 지정 구역 Drop (Sorter)</h3>
+                    <p><span class="spec">시간당 처리량 :</span> 1,800 개</p>
+                    <p><span class="spec">필요 인력/대수 :</span> 0 대 (자동)</p>
+                    <p><span class="spec">설명 :</span> RFID 정보와 고객 정보를 바탕으로 의류를 분류하여 지정된 슈트(Chute)로 자동 배출합니다.</p>
+                </div>
+                <div class="details-card border-red-200 bg-red-50">
+                    <h3>7-9. NO RFID Loop</h3>
+                    <p><span class="spec">시간당 처리량 :</span> 300 개</p>
+                    <p><span class="spec">필요 인력/대수 :</span> 1 명</p>
+                    <p><span class="spec">설명 :</span> RFID 태그가 없는 의류는 별도 라인으로 이동하여 바코드를 부착하고, 작업자가 수동으로 RFID 태그를 삽입한 후 3번 공정으로 재투입합니다.</p>
                 </div>
             </div>
         </div>
+        
     </div>
 </body>
 </html>
