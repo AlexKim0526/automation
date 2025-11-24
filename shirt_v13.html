@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세탁물 오분류 분석 도구 (v13)</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+        }
+        h1, h2, h3, h4 {
+            color: #333;
+        }
+        
+        #controls {
+            position: sticky;
+            top: 0;
+            z-index: 900;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        #reset-button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: auto; 
+        }
+        #reset-button:hover {
+            background-color: #c82333;
+        }
+
+        #file-input {
+            font-size: 16px;
+        }
+        
+        #main-container {
+            display: flex;
+            gap: 20px;
+        }
+        #image-browser {
+            flex: 3;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 10px 20px;
+        }
+        
+        /* 우측 통계 패널 */
+        #stats-panel {
+            flex: 1.2; /* 너비 조금 더 확보 */
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            height: fit-content;
+            position: sticky;
+            top: 105px; 
+            max-height: calc(100vh - 125px);
+            overflow-y: auto;
+        }
+        #stats-panel h3 {
+            margin-top: 0;
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+
+        /* 분석 테이블 스타일 */
+        table.stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        table.stats-table th, table.stats-table td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+        }
+        table.stats-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        table.stats-table tr:hover {
+            background-color: #f1f1f1;
+        }
+        .highlight-row {
+            background-color: #e8f4ff;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .error-rate {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .customer-section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            overflow: hidden;
+        }
+        .customer-header {
+            background-color: #e9ecef;
+            padding: 10px 20px;
+            font-size: 20px;
+            font-weight: bold;
+            position: sticky;
+            top: 105px; 
+            z-index: 800;
+        }
+        
+        .category-section {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .category-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 5px;
+        }
+
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .image-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #fafafa;
+            position: relative;
+        }
+        
+        .image-item img {
+            width: 250px; 
+            height: 250px;
+            object-fit: cover;
+            border-radius: 4px;
+            cursor: zoom-in;
+        }
+        
+        .image-item .category-text {
+            font-size: 15px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 5px;
+        }
+        .image-item .corrected-text {
+            font-size: 14px;
+            color: #dc3545; /* 수정됨 표시 색상 */
+            font-weight: bold;
+            display: none; /* 기본 숨김 */
+        }
+        .image-item.corrected .category-text {
+            text-decoration: line-through;
+            color: #999;
+            font-size: 12px;
+        }
+        .image-item.corrected .corrected-text {
+            display: block;
+        }
+        .image-item.corrected {
+            border-color: #dc3545;
+            background-color: #fff5f5;
+        }
+
+        /* 품목 변경 버튼 */
+        .change-btn {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .change-btn:hover {
+            background-color: #5a6268;
+        }
+
+        /* --- 모달 스타일 (이미지 확대용) --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+            cursor: zoom-out;
+        }
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* --- 품목 선택 팝업 (모달) --- */
+        #selectionModal {
+            display: none;
+            position: fixed;
+            z-index: 2001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .selection-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .selection-box h3 {
+            margin-top: 0;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .selection-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .selection-list li {
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background 0.2s;
+            text-align: center;
+        }
+        .selection-list li:hover {
+            background-color: #e9ecef;
+            font-weight: bold;
+        }
+        .selection-close {
+            margin-top: 15px;
+            width: 100%;
+            padding: 10px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>세탁물 오분류 분석 도구 (v13)</h1>
+    <p><strong>raw_data_updated.csv</strong> 파일을 선택하세요. (품목 변경 및 통계 분석)</p>
+
+    <div id="controls">
+        <input type="file" id="file-input" accept=".csv">
+        <button id="reset-button">분석 데이터 초기화</button>
+    </div>
+
+    <div id="main-container">
+
+        <div id="image-browser">
+            <h2 style="margin-top: 10px;">이미지 목록</h2>
+            <div id="content"></div>
+        </div>
+
+        <div id="stats-panel">
+            <h3>오분류 분석 현황</h3>
+            <div id="dashboard-content">
+                <p style="text-align:center; color:#666;">파일을 로드하면 분석표가 표시됩니다.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="imageModal" class="modal">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="img01">
+    </div>
+
+    <div id="selectionModal">
+        <div class="selection-box">
+            <h3>변경할 품목 선택</h3>
+            <ul id="selectionList" class="selection-list">
+                </ul>
+            <button class="selection-close" onclick="closeSelectionModal()">취소</button>
+        </div>
+    </div>
+
+    <script>
+        const resetButton = document.getElementById('reset-button');
+        const imageModal = document.getElementById('imageModal');
+        const modalImg = document.getElementById("img01");
+        const closeBtn = document.getElementsByClassName("modal-close")[0];
+        const selectionModal = document.getElementById('selectionModal');
+        const selectionList = document.getElementById('selectionList');
+
+        const CORRECTION_KEY = "misclass_corrections_v13";
+        
+        // 전역 데이터
+        window.allCategories = new Set(); // 발견된 모든 카테고리 목록
+        window.corrections = {}; // { imgUrl: "변경된카테고리" }
+        window.loadedData = {}; // { user: [ {url, category, date}, ... ] }
+        window.totalCounts = {}; // { category: count } - 원본 데이터 기준
+
+        document.getElementById('file-input').addEventListener('change', handleFileSelect);
+        
+        // 초기화 버튼
+        resetButton.onclick = function() {
+            if (confirm("모든 오분류 수정 내역을 초기화하시겠습니까?")) {
+                localStorage.removeItem(CORRECTION_KEY);
+                alert("초기화되었습니다. 페이지를 새로고침합니다.");
+                location.reload();
+            }
+        };
+
+        // 모달 관련
+        closeBtn.onclick = () => imageModal.style.display = "none";
+        imageModal.onclick = () => imageModal.style.display = "none";
+        modalImg.onclick = () => imageModal.style.display = "none";
+
+        function closeSelectionModal() {
+            selectionModal.style.display = "none";
+        }
+
+        function handleFileSelect(event) {
+            // 변수 초기화
+            window.allCategories = new Set();
+            window.corrections = JSON.parse(localStorage.getItem(CORRECTION_KEY)) || {};
+            window.loadedData = {};
+            window.totalCounts = {};
+            
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                processData(e.target.result);
+            };
+            
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function processData(csvText) {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = "";
+
+            const lines = csvText.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            
+            const userIndex = headers.indexOf("userCardNo");
+            const dateIndex = headers.indexOf("real_collection_date");
+            const urlIndex = headers.indexOf("img_url");
+            const categoryIndex = headers.indexOf("category"); 
+
+            if (userIndex === -1 || categoryIndex === -1) {
+                alert("필수 컬럼 누락 (userCardNo, category, img_url 확인)");
+                return;
+            }
+
+            // 제외 항목 (와이셔츠, 일반셔츠는 포함됨)
+            const excludeCategories = ["부속품", "세탁불가 부속품", "세탁가능 부속품", "운동화"];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                if (values.length <= Math.max(userIndex, urlIndex, categoryIndex)) continue; 
+                
+                const user = values[userIndex].trim();
+                const url = values[urlIndex].trim();
+                const category = (values[categoryIndex]) ? values[categoryIndex].trim() : '기타'; 
+                const date = (dateIndex > -1) ? values[dateIndex].trim() : '';
+                
+                if (excludeCategories.includes(category) || !url.startsWith('http')) continue;
+
+                // 전체 카테고리 수집 (선택 목록용)
+                window.allCategories.add(category);
+                
+                // 원본 카테고리별 카운트
+                if (!window.totalCounts[category]) window.totalCounts[category] = 0;
+                window.totalCounts[category]++;
+
+                if (!window.loadedData[user]) window.loadedData[user] = [];
+                window.loadedData[user].push({ url, category, date });
+            }
+            
+            // 데이터 정렬
+            for (const user in window.loadedData) {
+                window.loadedData[user].sort((a, b) => a.category.localeCompare(b.category));
+            }
+
+            displayImages();
+            updateDashboard();
+        }
+
+        function displayImages() {
+            const contentDiv = document.getElementById('content');
+            const sortedUsers = Object.keys(window.loadedData).sort();
+
+            for (const user of sortedUsers) {
+                const items = window.loadedData[user];
+                
+                const customerSection = document.createElement('div');
+                customerSection.className = 'customer-section';
+                
+                const customerHeader = document.createElement('div');
+                customerHeader.className = 'customer-header';
+                customerHeader.textContent = `고객 ID: ${user}`;
+                customerSection.appendChild(customerHeader);
+                
+                let currentCategory = "";
+                let imageContainer;
+
+                items.forEach(item => {
+                    if (item.category !== currentCategory) {
+                        currentCategory = item.category;
+                        
+                        const categorySection = document.createElement('div');
+                        categorySection.className = 'category-section';
+                        const catHeader = document.createElement('h4');
+                        catHeader.className = 'category-header';
+                        catHeader.textContent = currentCategory;
+                        
+                        imageContainer = document.createElement('div');
+                        imageContainer.className = 'image-container';
+
+                        categorySection.appendChild(catHeader);
+                        categorySection.appendChild(imageContainer);
+                        customerSection.appendChild(categorySection);
+                    }
+
+                    // 아이템 생성
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'image-item';
+                    itemDiv.id = `item-${CSS.escape(item.url)}`; // URL 기반 ID
+
+                    // 수정 여부 확인
+                    const correctedCat = window.corrections[item.url];
+                    if (correctedCat) {
+                        itemDiv.classList.add('corrected');
+                    }
+
+                    const img = document.createElement('img');
+                    img.src = item.url;
+                    img.onclick = () => openImageModal(item.url);
+
+                    const catText = document.createElement('div');
+                    catText.className = 'category-text';
+                    catText.textContent = item.category;
+
+                    const correctedText = document.createElement('div');
+                    correctedText.className = 'corrected-text';
+                    correctedText.textContent = `→ ${correctedCat || ''}`;
+
+                    // 품목 변경 버튼
+                    const changeBtn = document.createElement('button');
+                    changeBtn.className = 'change-btn';
+                    changeBtn.innerHTML = '✏️ 품목변경';
+                    changeBtn.onclick = () => openSelectionModal(item.url, item.category);
+
+                    itemDiv.appendChild(img);
+                    itemDiv.appendChild(catText);
+                    itemDiv.appendChild(correctedText);
+                    itemDiv.appendChild(changeBtn);
+                    
+                    imageContainer.appendChild(itemDiv);
+                });
+                
+                contentDiv.appendChild(customerSection);
+            }
+        }
+
+        // 품목 변경 모달 열기
+        function openSelectionModal(url, currentCategory) {
+            selectionList.innerHTML = "";
+            const sortedCats = Array.from(window.allCategories).sort();
+            
+            // 현재 품목 제외하고 리스트 생성
+            sortedCats.forEach(cat => {
+                if (cat === currentCategory) return;
+
+                const li = document.createElement('li');
+                li.textContent = cat;
+                li.onclick = () => applyCorrection(url, cat);
+                selectionList.appendChild(li);
+            });
+
+            // '기타' 옵션이 없다면 추가
+            if (!window.allCategories.has("기타") && currentCategory !== "기타") {
+                const li = document.createElement('li');
+                li.textContent = "기타";
+                li.onclick = () => applyCorrection(url, "기타");
+                selectionList.appendChild(li);
+            }
+
+            selectionModal.style.display = "flex";
+        }
+
+        // 품목 정정 적용
+        function applyCorrection(url, newCategory) {
+            window.corrections[url] = newCategory;
+            localStorage.setItem(CORRECTION_KEY, JSON.stringify(window.corrections));
+            
+            // UI 업데이트
+            const itemDiv = document.getElementById(`item-${CSS.escape(url)}`);
+            if (itemDiv) {
+                itemDiv.classList.add('corrected');
+                itemDiv.querySelector('.corrected-text').textContent = `→ ${newCategory}`;
+            }
+            
+            closeSelectionModal();
+            updateDashboard();
+        }
+
+        // 대시보드 업데이트 (통계 계산)
+        function updateDashboard() {
+            const dashboard = document.getElementById('dashboard-content');
+            
+            // 통계 집계
+            // { category: { total: N, correctedCount: M } }
+            const stats = {};
+            let grandTotal = 0;
+            let grandCorrected = 0;
+
+            // 1. 기본 카운트 초기화
+            window.allCategories.forEach(cat => {
+                stats[cat] = { total: window.totalCounts[cat] || 0, correctedCount: 0 };
+                grandTotal += stats[cat].total;
+            });
+
+            // 2. 수정 내역 반영
+            // 주의: total은 '원본' 기준입니다. (해당 품목이라 분류되었던 것 중 얼마나 틀렸나)
+            // 따라서 corrections에 있는 URL의 원본 카테고리를 찾아야 합니다.
+            
+            // 효율적인 검색을 위해 URL -> Original Category 맵핑이 필요할 수 있으나,
+            // 여기서는 loadedData를 순회하며 확인합니다.
+            for (const user in window.loadedData) {
+                window.loadedData[user].forEach(item => {
+                    const correctedTo = window.corrections[item.url];
+                    if (correctedTo) {
+                        // 원본 카테고리의 오분류 카운트 증가
+                        if (stats[item.category]) {
+                            stats[item.category].correctedCount++;
+                            grandCorrected++;
+                        }
+                    }
+                });
+            }
+
+            // 3. 테이블 생성
+            let html = `
+                <div style="text-align:center; margin-bottom:15px;">
+                    <strong>전체 오분류율:</strong> 
+                    <span style="font-size:1.5em; color:#dc3545;">
+                        ${((grandCorrected / grandTotal) * 100).toFixed(1)}%
+                    </span> 
+                    (${grandCorrected} / ${grandTotal}건)
+                </div>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>품목명</th>
+                            <th>전체 건수</th>
+                            <th>정정 건수</th>
+                            <th>오분류율</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            const sortedCats = Object.keys(stats).sort();
+            
+            // 와이셔츠, 일반셔츠를 상단에 보여주고 싶으면 여기서 정렬 로직 수정 가능
+            // 일단 가나다순 출력
+            sortedCats.forEach(cat => {
+                const data = stats[cat];
+                if (data.total === 0) return;
+
+                const rate = ((data.correctedCount / data.total) * 100).toFixed(1);
+                const isHighlight = (cat === "와이셔츠" || cat === "일반셔츠");
+                const rowClass = isHighlight ? "highlight-row" : "";
+                
+                // 오분류율이 높으면 빨간색 표시
+                const rateClass = (parseFloat(rate) > 0) ? "error-rate" : "";
+
+                html += `
+                    <tr class="${rowClass}">
+                        <td>${cat}</td>
+                        <td>${data.total}</td>
+                        <td>${data.correctedCount > 0 ? data.correctedCount : '-'}</td>
+                        <td class="${rateClass}">${data.correctedCount > 0 ? rate + '%' : '-'}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            dashboard.innerHTML = html;
+        }
+
+        function openImageModal(url) {
+            imageModal.style.display = "flex";
+            document.getElementById("img01").src = url;
+        }
+
+    </script>
+
+</body>
+</html>
