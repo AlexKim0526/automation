@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>세탁물 오분류 분석 도구 (v13)</title>
+    <title>세탁물 오분류 분석 도구 (v14)</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -26,21 +26,30 @@
             margin-bottom: 20px;
             display: flex;
             align-items: center;
+            gap: 10px; /* 버튼 간격 */
         }
         
-        #reset-button {
-            background-color: #dc3545;
-            color: white;
+        button {
             border: none;
             padding: 10px 15px;
             font-size: 14px;
             border-radius: 5px;
             cursor: pointer;
-            margin-left: auto; 
+            color: white;
+            transition: background 0.2s;
         }
-        #reset-button:hover {
-            background-color: #c82333;
+
+        /* [v14] 버튼 스타일 세분화 */
+        #download-btn {
+            background-color: #28a745; /* 초록색 */
+            margin-left: auto; /* 우측 정렬 */
         }
+        #download-btn:hover { background-color: #218838; }
+
+        #reset-btn {
+            background-color: #dc3545; /* 빨간색 */
+        }
+        #reset-btn:hover { background-color: #c82333; }
 
         #file-input {
             font-size: 16px;
@@ -58,9 +67,8 @@
             padding: 10px 20px;
         }
         
-        /* 우측 통계 패널 */
         #stats-panel {
-            flex: 1.2; /* 너비 조금 더 확보 */
+            flex: 1.2; 
             background: #fff;
             border: 1px solid #ddd;
             border-radius: 8px;
@@ -78,7 +86,6 @@
             padding-bottom: 10px;
         }
 
-        /* 분석 테이블 스타일 */
         table.stats-table {
             width: 100%;
             border-collapse: collapse;
@@ -169,9 +176,9 @@
         }
         .image-item .corrected-text {
             font-size: 14px;
-            color: #dc3545; /* 수정됨 표시 색상 */
+            color: #dc3545; 
             font-weight: bold;
-            display: none; /* 기본 숨김 */
+            display: none; 
         }
         .image-item.corrected .category-text {
             text-decoration: line-through;
@@ -186,7 +193,6 @@
             background-color: #fff5f5;
         }
 
-        /* 품목 변경 버튼 */
         .change-btn {
             background-color: #6c757d;
             color: white;
@@ -204,7 +210,6 @@
             background-color: #5a6268;
         }
 
-        /* --- 모달 스타일 (이미지 확대용) --- */
         .modal {
             display: none;
             position: fixed;
@@ -236,7 +241,6 @@
             cursor: pointer;
         }
 
-        /* --- 품목 선택 팝업 (모달) --- */
         #selectionModal {
             display: none;
             position: fixed;
@@ -295,12 +299,13 @@
 </head>
 <body>
 
-    <h1>세탁물 오분류 분석 도구 (v13)</h1>
-    <p><strong>raw_data_updated.csv</strong> 파일을 선택하세요. (품목 변경 및 통계 분석)</p>
+    <h1>세탁물 오분류 분석 도구 (v14)</h1>
+    <p><strong>raw_data_updated.csv</strong> 파일을 선택하세요. (수정 내역 다운로드 가능)</p>
 
     <div id="controls">
         <input type="file" id="file-input" accept=".csv">
-        <button id="reset-button">분석 데이터 초기화</button>
+        <button id="download-btn" onclick="downloadCorrections()">💾 수정 내역 다운로드 (CSV)</button>
+        <button id="reset-btn" onclick="resetCorrections()">🗑️ 초기화</button>
     </div>
 
     <div id="main-container">
@@ -334,33 +339,83 @@
     </div>
 
     <script>
-        const resetButton = document.getElementById('reset-button');
         const imageModal = document.getElementById('imageModal');
         const modalImg = document.getElementById("img01");
         const closeBtn = document.getElementsByClassName("modal-close")[0];
         const selectionModal = document.getElementById('selectionModal');
         const selectionList = document.getElementById('selectionList');
 
-        const CORRECTION_KEY = "misclass_corrections_v13";
+        const CORRECTION_KEY = "misclass_corrections_v13"; // 키값 유지 (이전 데이터 연동)
         
-        // 전역 데이터
-        window.allCategories = new Set(); // 발견된 모든 카테고리 목록
-        window.corrections = {}; // { imgUrl: "변경된카테고리" }
-        window.loadedData = {}; // { user: [ {url, category, date}, ... ] }
-        window.totalCounts = {}; // { category: count } - 원본 데이터 기준
+        window.allCategories = new Set(); 
+        window.corrections = {}; 
+        window.loadedData = {}; 
+        window.totalCounts = {}; 
 
         document.getElementById('file-input').addEventListener('change', handleFileSelect);
         
-        // 초기화 버튼
-        resetButton.onclick = function() {
-            if (confirm("모든 오분류 수정 내역을 초기화하시겠습니까?")) {
+        // 초기화 함수
+        function resetCorrections() {
+            if (confirm("모든 오분류 수정 내역을 삭제하고 초기화하시겠습니까?")) {
                 localStorage.removeItem(CORRECTION_KEY);
                 alert("초기화되었습니다. 페이지를 새로고침합니다.");
                 location.reload();
             }
-        };
+        }
 
-        // 모달 관련
+        // [v14] 수정 내역 다운로드 함수
+        function downloadCorrections() {
+            const keys = Object.keys(window.corrections);
+            if (keys.length === 0) {
+                alert("저장된 수정 내역이 없습니다.");
+                return;
+            }
+
+            // CSV 헤더 (엑셀 호환을 위해 BOM 추가)
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "회원번호,세탁일,원본_품목,정정_품목,이미지URL\n";
+
+            // corrections에는 URL:정정품목 만 있으므로, 상세 정보를 찾기 위해 loadedData 순회
+            let matchCount = 0;
+
+            for (const user in window.loadedData) {
+                window.loadedData[user].forEach(item => {
+                    const correctedValue = window.corrections[item.url];
+                    if (correctedValue) {
+                        const row = [
+                            user,
+                            item.date,
+                            item.category,
+                            correctedValue,
+                            item.url
+                        ].map(field => `"${field}"`).join(","); // 쉼표 포함 대비 따옴표 감싸기
+                        
+                        csvContent += row + "\n";
+                        matchCount++;
+                    }
+                });
+            }
+
+            if (matchCount === 0) {
+                alert("현재 로드된 파일과 매칭되는 수정 내역이 없습니다.\n파일을 먼저 로드해주세요.");
+                return;
+            }
+
+            // 다운로드 트리거
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            
+            // 파일명 생성 (날짜시간 포함)
+            const now = new Date();
+            const timeStr = now.toISOString().slice(0,19).replace(/:/g,"");
+            link.setAttribute("download", `오분류_수정내역_${timeStr}.csv`);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
         closeBtn.onclick = () => imageModal.style.display = "none";
         imageModal.onclick = () => imageModal.style.display = "none";
         modalImg.onclick = () => imageModal.style.display = "none";
@@ -370,7 +425,6 @@
         }
 
         function handleFileSelect(event) {
-            // 변수 초기화
             window.allCategories = new Set();
             window.corrections = JSON.parse(localStorage.getItem(CORRECTION_KEY)) || {};
             window.loadedData = {};
@@ -403,7 +457,6 @@
                 return;
             }
 
-            // 제외 항목 (와이셔츠, 일반셔츠는 포함됨)
             const excludeCategories = ["부속품", "세탁불가 부속품", "세탁가능 부속품", "운동화"];
 
             for (let i = 1; i < lines.length; i++) {
@@ -417,10 +470,8 @@
                 
                 if (excludeCategories.includes(category) || !url.startsWith('http')) continue;
 
-                // 전체 카테고리 수집 (선택 목록용)
                 window.allCategories.add(category);
                 
-                // 원본 카테고리별 카운트
                 if (!window.totalCounts[category]) window.totalCounts[category] = 0;
                 window.totalCounts[category]++;
 
@@ -428,7 +479,6 @@
                 window.loadedData[user].push({ url, category, date });
             }
             
-            // 데이터 정렬
             for (const user in window.loadedData) {
                 window.loadedData[user].sort((a, b) => a.category.localeCompare(b.category));
             }
@@ -473,12 +523,10 @@
                         customerSection.appendChild(categorySection);
                     }
 
-                    // 아이템 생성
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'image-item';
-                    itemDiv.id = `item-${CSS.escape(item.url)}`; // URL 기반 ID
+                    itemDiv.id = `item-${CSS.escape(item.url)}`; 
 
-                    // 수정 여부 확인
                     const correctedCat = window.corrections[item.url];
                     if (correctedCat) {
                         itemDiv.classList.add('corrected');
@@ -496,7 +544,6 @@
                     correctedText.className = 'corrected-text';
                     correctedText.textContent = `→ ${correctedCat || ''}`;
 
-                    // 품목 변경 버튼
                     const changeBtn = document.createElement('button');
                     changeBtn.className = 'change-btn';
                     changeBtn.innerHTML = '✏️ 품목변경';
@@ -510,143 +557,4 @@
                     imageContainer.appendChild(itemDiv);
                 });
                 
-                contentDiv.appendChild(customerSection);
-            }
-        }
-
-        // 품목 변경 모달 열기
-        function openSelectionModal(url, currentCategory) {
-            selectionList.innerHTML = "";
-            const sortedCats = Array.from(window.allCategories).sort();
-            
-            // 현재 품목 제외하고 리스트 생성
-            sortedCats.forEach(cat => {
-                if (cat === currentCategory) return;
-
-                const li = document.createElement('li');
-                li.textContent = cat;
-                li.onclick = () => applyCorrection(url, cat);
-                selectionList.appendChild(li);
-            });
-
-            // '기타' 옵션이 없다면 추가
-            if (!window.allCategories.has("기타") && currentCategory !== "기타") {
-                const li = document.createElement('li');
-                li.textContent = "기타";
-                li.onclick = () => applyCorrection(url, "기타");
-                selectionList.appendChild(li);
-            }
-
-            selectionModal.style.display = "flex";
-        }
-
-        // 품목 정정 적용
-        function applyCorrection(url, newCategory) {
-            window.corrections[url] = newCategory;
-            localStorage.setItem(CORRECTION_KEY, JSON.stringify(window.corrections));
-            
-            // UI 업데이트
-            const itemDiv = document.getElementById(`item-${CSS.escape(url)}`);
-            if (itemDiv) {
-                itemDiv.classList.add('corrected');
-                itemDiv.querySelector('.corrected-text').textContent = `→ ${newCategory}`;
-            }
-            
-            closeSelectionModal();
-            updateDashboard();
-        }
-
-        // 대시보드 업데이트 (통계 계산)
-        function updateDashboard() {
-            const dashboard = document.getElementById('dashboard-content');
-            
-            // 통계 집계
-            // { category: { total: N, correctedCount: M } }
-            const stats = {};
-            let grandTotal = 0;
-            let grandCorrected = 0;
-
-            // 1. 기본 카운트 초기화
-            window.allCategories.forEach(cat => {
-                stats[cat] = { total: window.totalCounts[cat] || 0, correctedCount: 0 };
-                grandTotal += stats[cat].total;
-            });
-
-            // 2. 수정 내역 반영
-            // 주의: total은 '원본' 기준입니다. (해당 품목이라 분류되었던 것 중 얼마나 틀렸나)
-            // 따라서 corrections에 있는 URL의 원본 카테고리를 찾아야 합니다.
-            
-            // 효율적인 검색을 위해 URL -> Original Category 맵핑이 필요할 수 있으나,
-            // 여기서는 loadedData를 순회하며 확인합니다.
-            for (const user in window.loadedData) {
-                window.loadedData[user].forEach(item => {
-                    const correctedTo = window.corrections[item.url];
-                    if (correctedTo) {
-                        // 원본 카테고리의 오분류 카운트 증가
-                        if (stats[item.category]) {
-                            stats[item.category].correctedCount++;
-                            grandCorrected++;
-                        }
-                    }
-                });
-            }
-
-            // 3. 테이블 생성
-            let html = `
-                <div style="text-align:center; margin-bottom:15px;">
-                    <strong>전체 오분류율:</strong> 
-                    <span style="font-size:1.5em; color:#dc3545;">
-                        ${((grandCorrected / grandTotal) * 100).toFixed(1)}%
-                    </span> 
-                    (${grandCorrected} / ${grandTotal}건)
-                </div>
-                <table class="stats-table">
-                    <thead>
-                        <tr>
-                            <th>품목명</th>
-                            <th>전체 건수</th>
-                            <th>정정 건수</th>
-                            <th>오분류율</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            const sortedCats = Object.keys(stats).sort();
-            
-            // 와이셔츠, 일반셔츠를 상단에 보여주고 싶으면 여기서 정렬 로직 수정 가능
-            // 일단 가나다순 출력
-            sortedCats.forEach(cat => {
-                const data = stats[cat];
-                if (data.total === 0) return;
-
-                const rate = ((data.correctedCount / data.total) * 100).toFixed(1);
-                const isHighlight = (cat === "와이셔츠" || cat === "일반셔츠");
-                const rowClass = isHighlight ? "highlight-row" : "";
-                
-                // 오분류율이 높으면 빨간색 표시
-                const rateClass = (parseFloat(rate) > 0) ? "error-rate" : "";
-
-                html += `
-                    <tr class="${rowClass}">
-                        <td>${cat}</td>
-                        <td>${data.total}</td>
-                        <td>${data.correctedCount > 0 ? data.correctedCount : '-'}</td>
-                        <td class="${rateClass}">${data.correctedCount > 0 ? rate + '%' : '-'}</td>
-                    </tr>
-                `;
-            });
-
-            html += `</tbody></table>`;
-            dashboard.innerHTML = html;
-        }
-
-        function openImageModal(url) {
-            imageModal.style.display = "flex";
-            document.getElementById("img01").src = url;
-        }
-
-    </script>
-
-</body>
-</html>
+                contentDiv.appendChild
