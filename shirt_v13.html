@@ -557,4 +557,123 @@
                     imageContainer.appendChild(itemDiv);
                 });
                 
-                contentDiv.appendChild
+                contentDiv.appendChild(customerSection);
+            }
+        }
+
+        function openSelectionModal(url, currentCategory) {
+            selectionList.innerHTML = "";
+            const sortedCats = Array.from(window.allCategories).sort();
+            
+            sortedCats.forEach(cat => {
+                if (cat === currentCategory) return;
+
+                const li = document.createElement('li');
+                li.textContent = cat;
+                li.onclick = () => applyCorrection(url, cat);
+                selectionList.appendChild(li);
+            });
+
+            if (!window.allCategories.has("기타") && currentCategory !== "기타") {
+                const li = document.createElement('li');
+                li.textContent = "기타";
+                li.onclick = () => applyCorrection(url, "기타");
+                selectionList.appendChild(li);
+            }
+
+            selectionModal.style.display = "flex";
+        }
+
+        function applyCorrection(url, newCategory) {
+            window.corrections[url] = newCategory;
+            localStorage.setItem(CORRECTION_KEY, JSON.stringify(window.corrections));
+            
+            const itemDiv = document.getElementById(`item-${CSS.escape(url)}`);
+            if (itemDiv) {
+                itemDiv.classList.add('corrected');
+                itemDiv.querySelector('.corrected-text').textContent = `→ ${newCategory}`;
+            }
+            
+            closeSelectionModal();
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            const dashboard = document.getElementById('dashboard-content');
+            
+            const stats = {};
+            let grandTotal = 0;
+            let grandCorrected = 0;
+
+            window.allCategories.forEach(cat => {
+                stats[cat] = { total: window.totalCounts[cat] || 0, correctedCount: 0 };
+                grandTotal += stats[cat].total;
+            });
+
+            for (const user in window.loadedData) {
+                window.loadedData[user].forEach(item => {
+                    const correctedTo = window.corrections[item.url];
+                    if (correctedTo) {
+                        if (stats[item.category]) {
+                            stats[item.category].correctedCount++;
+                            grandCorrected++;
+                        }
+                    }
+                });
+            }
+
+            let html = `
+                <div style="text-align:center; margin-bottom:15px;">
+                    <strong>전체 오분류율:</strong> 
+                    <span style="font-size:1.5em; color:#dc3545;">
+                        ${((grandCorrected / grandTotal) * 100).toFixed(1)}%
+                    </span> 
+                    (${grandCorrected} / ${grandTotal}건)
+                </div>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>품목명</th>
+                            <th>전체 건수</th>
+                            <th>정정 건수</th>
+                            <th>오분류율</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            const sortedCats = Object.keys(stats).sort();
+            
+            sortedCats.forEach(cat => {
+                const data = stats[cat];
+                if (data.total === 0) return;
+
+                const rate = ((data.correctedCount / data.total) * 100).toFixed(1);
+                const isHighlight = (cat === "와이셔츠" || cat === "일반셔츠");
+                const rowClass = isHighlight ? "highlight-row" : "";
+                
+                const rateClass = (parseFloat(rate) > 0) ? "error-rate" : "";
+
+                html += `
+                    <tr class="${rowClass}">
+                        <td>${cat}</td>
+                        <td>${data.total}</td>
+                        <td>${data.correctedCount > 0 ? data.correctedCount : '-'}</td>
+                        <td class="${rateClass}">${data.correctedCount > 0 ? rate + '%' : '-'}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            dashboard.innerHTML = html;
+        }
+
+        function openImageModal(url) {
+            imageModal.style.display = "flex";
+            document.getElementById("img01").src = url;
+        }
+
+    </script>
+
+</body>
+</html>
