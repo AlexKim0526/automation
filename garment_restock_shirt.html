@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세탁물 재입고 확인 도구 (v24 - 전체내역 다운로드)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
+        h1, h2, h3, h4 { color: #333; }
+        
+        /* 상단 컨트롤 바 */
+        #controls {
+            position: sticky; top: 0; z-index: 900;
+            padding: 15px 20px; background-color: #ffffff;
+            border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px; 
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+        }
+        
+        .divider { width: 1px; height: 30px; background-color: #ddd; margin: 0 5px; }
+        select, input[type="number"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        input[type="number"] { width: 60px; }
+
+        #connection-status {
+            padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold;
+            background-color: #ccc; color: #fff; margin-right: 10px;
+        }
+        #connection-status.connected { background-color: #28a745; }
+        #connection-status.disconnected { background-color: #dc3545; }
+
+        button { border: none; padding: 8px 12px; font-size: 14px; border-radius: 5px; cursor: pointer; color: white; transition: background 0.2s; white-space: nowrap; }
+        
+        #apply-range-btn { background-color: #17a2b8; }
+        #apply-range-btn:hover { background-color: #138496; }
+        #download-btn { background-color: #28a745; margin-left: auto; }
+        #download-btn:hover { background-color: #218838; }
+        #reset-btn { background-color: #dc3545; }
+        #reset-btn:hover { background-color: #c82333; }
+        #file-input { font-size: 14px; }
+
+        /* 플로팅 확인 버튼 컨테이너 */
+        #floating-confirm-container {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { bottom: -100px; opacity: 0; }
+            to { bottom: 40px; opacity: 1; }
+        }
+
+        /* 플로팅 버튼 스타일 */
+        #confirm-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex; align-items: center; gap: 10px;
+        }
+        #confirm-button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+            box-shadow: 0 15px 25px rgba(0,0,0,0.4);
+        }
+        
+        #main-container { display: flex; gap: 20px; }
+        #image-browser { flex: 3; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); padding: 10px 20px; }
+        
+        #confirmed-panel {
+            flex: 1.2; background: #fdfdfd; border: 1px dashed #007bff;
+            border-radius: 8px; padding: 20px; height: fit-content;
+            position: sticky; top: 105px; max-height: calc(100vh - 125px); overflow-y: auto;
+        }
+        #confirmed-panel h3 { margin-top: 0; color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+
+        #stats-wrapper { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 20px; }
+        #global-stats-container { text-align: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd; }
+        #global-stats-label { font-size: 14px; color: #666; display: block; text-transform: uppercase; margin-bottom: 5px; }
+        #global-stats-value { font-size: 28px; font-weight: bold; color: #007bff; }
+        #category-stats-container { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+        .cat-stat-item { background: #fff; padding: 6px 10px; border-radius: 4px; border: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .cat-stat-name { font-weight: 600; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+        .cat-stat-val { color: #777; }
+        .cat-stat-val.active { color: #dc3545; font-weight: bold; }
+
+        .customer-section { margin-bottom: 30px; border: 1px solid #ddd; border-radius: 8px; background-color: #fff; overflow: hidden; }
+        .customer-header { background-color: #e9ecef; padding: 10px 20px; font-size: 18px; font-weight: bold; position: sticky; top: 105px; z-index: 800; display: flex; justify-content: space-between; }
+        .customer-no { color: #007bff; margin-right: 10px; }
+        .category-section { padding: 20px; border-bottom: 1px solid #eee; }
+        .category-header { font-size: 18px; font-weight: 600; color: #555; margin-bottom: 15px; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px; }
+        
+        .image-container { display: flex; flex-wrap: wrap; gap: 20px; }
+        .image-item { display: flex; flex-direction: column; align-items: center; gap: 8px; border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #fafafa; }
+        .image-item img { width: 250px; height: 250px; object-fit: cover; border-radius: 4px; cursor: zoom-in; }
+        .image-item input[type="checkbox"] { width: 25px; height: 25px; cursor: pointer; }
+        .image-item .category-text { font-size: 14px; color: #666; margin-top: -5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
+        .image-item.disabled { opacity: 0.4; background-color: #e0e0e0; }
+        .image-item.disabled img { border: 3px solid #007bff; cursor: not-allowed; }
+        .image-item.disabled input[type="checkbox"] { visibility: hidden; }
+
+        .confirmed-customer-group { border: 1px solid #ddd; background: #fff; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .confirmed-customer-group h4 { font-size: 16px; margin: 0; padding: 10px 15px; background: #f0f8ff; border-bottom: 1px solid #ddd; border-radius: 8px 8px 0 0; }
+        .pairs-list { padding: 15px; }
+        .reorder-group { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .reorder-group:last-child { border-bottom: none; padding-bottom: 0; }
+        .reorder-group img { width: 75px; height: 75px; object-fit: cover; border-radius: 4px; cursor: zoom-in; }
+
+        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.85); justify-content: center; align-items: center; }
+        .modal-content { margin: auto; display: block; max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); cursor: zoom-out; }
+        .modal-caption { margin: auto; display: block; width: 80%; max-width: 700px; text-align: center; color: #ccc; padding: 10px 0; height: 150px; }
+        .modal-close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; transition: 0.3s; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>세탁물 재입고 확인 도구 (v24)</h1>
+    <p>파일 로드 시 <strong>인코딩</strong>을 확인하세요. <strong>[전체 내역 다운로드]</strong> 시 재입고 여부(O/X)가 포함됩니다.</p>
+
+    <div id="controls">
+        <span id="connection-status">DB 연결중...</span>
+        
+        <select id="encoding-select" title="파일 인코딩 선택">
+            <option value="UTF-8">UTF-8 (기본)</option>
+            <option value="EUC-KR" selected>EUC-KR (한글 깨짐 해결)</option>
+        </select>
+
+        <input type="file" id="file-input" accept=".csv">
+        
+        <div class="divider"></div>
+
+        <label>작업범위(No): </label>
+        <input type="number" id="start-index" placeholder="시작" min="1">
+        <span>~</span>
+        <input type="number" id="end-index" placeholder="끝" min="1">
+        <button id="apply-range-btn">범위 적용</button>
+
+        <div class="divider"></div>
+
+        <button id="download-btn">💾 전체 내역 다운로드 (O/X 포함)</button>
+        <button id="reset-btn">🗑️ DB 초기화</button>
+    </div>
+
+    <div id="floating-confirm-container">
+        <button id="confirm-button">✔ 선택한 이미지 재입고 확인 (저장)</button>
+    </div>
+
+    <div id="main-container">
+        <div id="image-browser">
+            <h2 style="margin-top: 10px;">세탁물 목록 <span id="range-display" style="font-size:0.8em; color:#666;"></span></h2>
+            <div id="content">
+                <p style="color:#888; text-align:center; margin-top:50px;">파일을 선택하면 목록이 표시됩니다.</p>
+            </div>
+        </div>
+
+        <div id="confirmed-panel">
+            <h3>재입고 확인 목록</h3>
+            <div id="stats-wrapper">
+                <div id="global-stats-container">
+                    <span id="global-stats-label">총 재입고 / 총 입고 (전체)</span>
+                    <div id="global-stats-value">0 / 0</div>
+                </div>
+                <div id="category-stats-container"></div>
+            </div>
+            <div id="confirmed-items-container"></div>
+        </div>
+    </div>
+
+    <div id="imageModal" class="modal">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="img01">
+        <div id="caption" class="modal-caption"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, remove, push } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+        // ============================================================
+        // [필수] Firebase 설정값을 아래에 붙여넣으세요
+        // ============================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOJ7J6HLtrKNh0_cj0GC61co3BkcdZK_M",
+            authDomain: "laundry-analysis.firebaseapp.com",
+            projectId: "laundry-analysis",
+            storageBucket: "laundry-analysis.firebasestorage.app",
+            messagingSenderId: "854398395582",
+            appId: "1:854398395582:web:5e84d045a38c6b652f6aef"
+        };
+        // ============================================================
+
+        let app, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            document.getElementById('connection-status').textContent = "Firebase 연결됨";
+            document.getElementById('connection-status').className = "connected";
+        } catch (e) {
+            console.error(e);
+            document.getElementById('connection-status').textContent = "설정 오류";
+            document.getElementById('connection-status').className = "disconnected";
+            alert("Firebase 설정이 필요합니다. 코드를 수정해주세요.");
+        }
+
+        const CONFIRMED_NODE = 'confirmed_reorders';
+
+        // 전역 변수
+        window.grandTotalItems = 0;
+        window.customerTotalItems = {}; 
+        window.categoryTotalItems = {}; 
+        window.firebaseData = {}; 
+        window.parsedCustomerData = {}; 
+        window.sortedUserKeys = [];
+        window.csvHeaders = []; // [v24] 원본 CSV 헤더 저장용
+
+        // DOM 요소
+        const confirmButton = document.getElementById('confirm-button');
+        const downloadButton = document.getElementById('download-btn');
+        const resetButton = document.getElementById('reset-btn');
+        const applyRangeButton = document.getElementById('apply-range-btn');
+        const fileInput = document.getElementById('file-input');
+        const encodingSelect = document.getElementById('encoding-select');
+        const floatingContainer = document.getElementById('floating-confirm-container');
+
+        const imageModal = document.getElementById('imageModal');
+        const modalImg = document.getElementById("img01");
+        const captionText = document.getElementById("caption");
+        const closeBtn = document.getElementsByClassName("modal-close")[0];
+
+        // 이벤트 리스너
+        fileInput.addEventListener('change', handleFileSelect);
+        confirmButton.addEventListener('click', confirmReorder);
+        applyRangeButton.addEventListener('click', () => {
+            if (window.sortedUserKeys.length === 0) {
+                alert("먼저 파일을 로드해주세요.");
+                return;
+            }
+            renderLeftPanel(); 
+            if(window.firebaseData) renderRightPanel(window.firebaseData);
+        });
+        
+        resetButton.onclick = function() {
+            if (confirm("정말로 DB를 초기화하시겠습니까? 모든 작업 내역이 삭제됩니다.")) {
+                remove(ref(db, CONFIRMED_NODE))
+                    .then(() => alert("DB 초기화 완료"))
+                    .catch((e) => alert("오류: " + e.message));
+            }
+        };
+
+        // [v24] 다운로드 버튼 핸들러 연결
+        downloadButton.onclick = () => downloadFullData();
+
+        // 체크박스 변경 시 플로팅 버튼 제어
+        document.addEventListener('change', function(e) {
+            if (e.target.type === 'checkbox') {
+                const checkedCount = document.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)').length;
+                if (checkedCount >= 2) {
+                    floatingContainer.style.display = 'block';
+                } else {
+                    floatingContainer.style.display = 'none';
+                }
+            }
+        });
+
+        // 모달
+        closeBtn.onclick = () => imageModal.style.display = "none";
+        imageModal.onclick = (e) => { if (e.target === imageModal) imageModal.style.display = "none"; };
+        modalImg.onclick = () => imageModal.style.display = "none";
+        window.openModal = function(imgElement) {
+            imageModal.style.display = "flex";
+            modalImg.src = imgElement.src;
+            captionText.innerHTML = imgElement.alt || imgElement.title || "이미지";
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const encoding = encodingSelect.value; 
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                processData(e.target.result);
+                startFirebaseListener();
+            };
+            reader.readAsText(file, encoding);
+        }
+
+        function processData(csvText) {
+            window.grandTotalItems = 0;
+            window.customerTotalItems = {};
+            window.categoryTotalItems = {};
+            window.parsedCustomerData = {};
+            window.sortedUserKeys = [];
+            window.csvHeaders = [];
+
+            const lines = csvText.trim().split('\n');
+            // [v24] 원본 헤더 저장
+            const headers = lines[0].split(',').map(h => h.trim());
+            window.csvHeaders = headers;
+            
+            const userIndex = headers.indexOf("userCardNo");
+            const dateIndex = headers.indexOf("real_collection_date");
+            const urlIndex = headers.indexOf("img_url");
+            const categoryIndex = headers.indexOf("category"); 
+
+            if (userIndex === -1 || dateIndex === -1 || urlIndex === -1 || categoryIndex === -1) {
+                alert("CSV 컬럼 확인 실패: userCardNo, real_collection_date, category, img_url 필요.");
+                return;
+            }
+
+            const excludeCategories = ["부속품", "세탁불가 부속품", "세탁가능 부속품", "운동화"];
+
+            for (let i = 1; i < lines.length; i++) {
+                const rowStr = lines[i];
+                // 쉼표 분리 (따옴표 처리 등 복잡한 CSV는 아니라고 가정)
+                const values = rowStr.split(',');
+                
+                if (values.length <= Math.max(userIndex, dateIndex, urlIndex, categoryIndex)) continue; 
+                
+                const user = values[userIndex].trim();
+                const date = values[dateIndex].trim();
+                const url = values[urlIndex].trim();
+                const category = (values[categoryIndex]) ? values[categoryIndex].trim() : '카테고리 없음'; 
+                
+                if (excludeCategories.includes(category) || !url.startsWith('http') || !user) continue; 
+
+                if (!window.customerTotalItems[user]) window.customerTotalItems[user] = 0;
+                window.customerTotalItems[user]++;
+
+                if (!window.categoryTotalItems[category]) window.categoryTotalItems[category] = 0;
+                window.categoryTotalItems[category]++;
+                
+                window.grandTotalItems++;
+                
+                if (!window.parsedCustomerData[user]) window.parsedCustomerData[user] = []; 
+                // [v24] 원본 Row 전체를 함께 저장 (다운로드용)
+                // CSV 생성 시 쉼표 문제를 피하기 위해 따옴표 처리 등을 직접 하기 위해 원본 배열 저장
+                window.parsedCustomerData[user].push({ 
+                    url: url, 
+                    category: category, 
+                    date: date,
+                    fullData: values // 전체 컬럼 데이터
+                }); 
+            }
+
+            for (const user in window.parsedCustomerData) {
+                window.parsedCustomerData[user].sort((a, b) => {
+                    if (a.category < b.category) return -1;
+                    if (a.category > b.category) return 1;
+                    return 0;
+                });
+            }
+
+            window.sortedUserKeys = Object.keys(window.parsedCustomerData).sort();
+            document.getElementById('start-index').value = 1;
+            document.getElementById('end-index').value = window.sortedUserKeys.length;
+
+            renderLeftPanel(); 
+            updateStatsUI({}, {}); 
+        }
+
+        function renderLeftPanel() {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = "";
+            
+            const startIndex = parseInt(document.getElementById('start-index').value) || 1;
+            const endIndex = parseInt(document.getElementById('end-index').value) || window.sortedUserKeys.length;
+            
+            document.getElementById('range-display').textContent = `(총 ${window.sortedUserKeys.length}명 중 ${startIndex}~${endIndex}번 표시)`;
+
+            for (let i = startIndex - 1; i < endIndex; i++) {
+                if (i < 0 || i >= window.sortedUserKeys.length) continue;
+
+                const user = window.sortedUserKeys[i];
+                const userNo = i + 1; 
+                const items = window.parsedCustomerData[user];
+
+                const customerSection = document.createElement('div');
+                customerSection.className = 'customer-section';
+                
+                const customerHeader = document.createElement('div');
+                customerHeader.className = 'customer-header';
+                customerHeader.innerHTML = `<span><span class="customer-no">No. ${userNo}</span> 고객 ID: ${user}</span>`;
+                
+                customerSection.appendChild(customerHeader);
+                
+                let currentCategory = "";
+                let imageContainer;
+
+                items.forEach(item => {
+                    if (item.category !== currentCategory) {
+                        currentCategory = item.category;
+                        const categorySection = document.createElement('div');
+                        categorySection.className = 'category-section';
+                        const categoryHeader = document.createElement('h4');
+                        categoryHeader.className = 'category-header';
+                        categoryHeader.textContent = currentCategory;
+                        imageContainer = document.createElement('div');
+                        imageContainer.className = 'image-container';
+                        categorySection.appendChild(categoryHeader);
+                        categorySection.appendChild(imageContainer);
+                        customerSection.appendChild(categorySection);
+                    }
+
+                    const imageItem = document.createElement('div');
+                    imageItem.className = 'image-item';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.dataset.imageUrl = item.url;
+                    checkbox.dataset.category = item.category;
+                    checkbox.dataset.user = user; 
+                    
+                    const img = document.createElement('img');
+                    img.src = item.url;
+                    img.alt = item.category;
+                    img.onclick = function() { window.openModal(this); };
+                    
+                    const categoryText = document.createElement('span');
+                    categoryText.className = 'category-text';
+                    categoryText.textContent = item.category;
+                    
+                    imageItem.appendChild(checkbox);
+                    imageItem.appendChild(img);
+                    imageItem.appendChild(categoryText); 
+                    imageContainer.appendChild(imageItem);
+                });
+                contentDiv.appendChild(customerSection);
+            }
+
+            if (window.firebaseData) {
+                disableConfirmedItems(window.firebaseData);
+            }
+        }
+
+        function startFirebaseListener() {
+            const confirmedRef = ref(db, CONFIRMED_NODE);
+            onValue(confirmedRef, (snapshot) => {
+                const data = snapshot.val() || {};
+                window.firebaseData = data; 
+                renderRightPanel(data);
+                calculateAndUpdateStats(data);
+                disableConfirmedItems(data);
+            });
+        }
+
+        function confirmReorder() {
+            const checkedBoxes = document.querySelectorAll('input[type="checkbox"]:checked:not(:disabled)');
+            if (checkedBoxes.length < 2) return; 
+
+            const firstUser = checkedBoxes[0].dataset.user;
+            let sameUser = true;
+            for (let i = 1; i < checkedBoxes.length; i++) {
+                if (checkedBoxes[i].dataset.user !== firstUser) { sameUser = false; break; }
+            }
+            if (!sameUser) { alert("같은 고객의 의류만 선택 가능"); return; }
+
+            const reorderGroupData = [];
+            checkedBoxes.forEach(box => {
+                reorderGroupData.push({ url: box.dataset.imageUrl, category: box.dataset.category });
+            });
+
+            const userRef = ref(db, `${CONFIRMED_NODE}/${firstUser}`);
+            const newGroupRef = push(userRef);
+            set(newGroupRef, reorderGroupData)
+                .then(() => {
+                    checkedBoxes.forEach(box => box.checked = false);
+                    floatingContainer.style.display = 'none';
+                })
+                .catch((error) => { alert("저장 실패: " + error.message); });
+        }
+
+        function renderRightPanel(data) {
+            const container = document.getElementById('confirmed-items-container');
+            container.innerHTML = "";
+
+            const startIndex = parseInt(document.getElementById('start-index').value) || 1;
+            const endIndex = parseInt(document.getElementById('end-index').value) || window.sortedUserKeys.length;
+
+            let usersToShow = Object.keys(data);
+            
+            if (window.sortedUserKeys.length > 0) {
+                usersToShow.sort((a, b) => {
+                    const idxA = window.sortedUserKeys.indexOf(a);
+                    const idxB = window.sortedUserKeys.indexOf(b);
+                    if (idxA === -1) return 1;
+                    if (idxB === -1) return -1;
+                    return idxA - idxB;
+                });
+
+                usersToShow = usersToShow.filter(user => {
+                    const idx = window.sortedUserKeys.indexOf(user);
+                    if (idx === -1) return false; 
+                    const userNo = idx + 1;
+                    return userNo >= startIndex && userNo <= endIndex;
+                });
+            } else {
+                usersToShow.sort();
+            }
+
+            usersToShow.forEach(user => {
+                const userGroups = data[user];
+                let userReorderedCount = 0;
+                Object.values(userGroups).forEach(group => userReorderedCount += group.length);
+                const userTotal = window.customerTotalItems[user] || 0;
+                
+                let userLabel = user;
+                if (window.sortedUserKeys.length > 0) {
+                    const idx = window.sortedUserKeys.indexOf(user);
+                    if (idx !== -1) {
+                        userLabel = `<span class="customer-no">No. ${idx + 1}</span> ${user}`;
+                    }
+                }
+
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'confirmed-customer-group';
+                const statsHeader = document.createElement('h4');
+                statsHeader.innerHTML = `고객 ${userLabel} (재입고: ${userReorderedCount} / 전체: ${userTotal})`;
+                const pairsListDiv = document.createElement('div');
+                pairsListDiv.className = 'pairs-list';
+
+                const groupKeys = Object.keys(userGroups).reverse(); 
+                
+                groupKeys.forEach(key => {
+                    const groupItems = userGroups[key];
+                    const reorderGroupDiv = document.createElement('div');
+                    reorderGroupDiv.className = 'reorder-group';
+                    groupItems.forEach(item => {
+                        const img = document.createElement('img');
+                        img.src = item.url;
+                        img.title = item.category;
+                        img.onclick = function() { window.openModal(this); };
+                        reorderGroupDiv.appendChild(img);
+                    });
+                    pairsListDiv.appendChild(reorderGroupDiv);
+                });
+
+                groupDiv.appendChild(statsHeader);
+                groupDiv.appendChild(pairsListDiv);
+                container.appendChild(groupDiv);
+            });
+        }
+
+        function calculateAndUpdateStats(data) {
+            let totalReordered = 0;
+            const currentCatReordered = {}; 
+            Object.values(data).forEach(userGroups => {
+                Object.values(userGroups).forEach(groupItems => {
+                    groupItems.forEach(item => {
+                        totalReordered++;
+                        if (!currentCatReordered[item.category]) currentCatReordered[item.category] = 0;
+                        currentCatReordered[item.category]++;
+                    });
+                });
+            });
+            updateStatsUI(totalReordered, currentCatReordered);
+        }
+
+        function updateStatsUI(totalReordered, currentCatReordered) {
+            const statsValueDiv = document.getElementById('global-stats-value');
+            if (statsValueDiv) {
+                statsValueDiv.textContent = `${totalReordered} / ${window.grandTotalItems}`;
+            }
+            const catContainer = document.getElementById('category-stats-container');
+            catContainer.innerHTML = ""; 
+            const sortedCats = Object.keys(window.categoryTotalItems).sort();
+            
+            sortedCats.forEach(cat => {
+                const total = window.categoryTotalItems[cat];
+                const reordered = currentCatReordered[cat] || 0;
+                const div = document.createElement('div');
+                div.className = 'cat-stat-item';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'cat-stat-name';
+                nameSpan.textContent = cat;
+                nameSpan.title = cat;
+                const valSpan = document.createElement('span');
+                valSpan.className = 'cat-stat-val';
+                valSpan.textContent = `${reordered} / ${total}`;
+                if (reordered > 0) valSpan.classList.add('active');
+                div.appendChild(nameSpan);
+                div.appendChild(valSpan);
+                catContainer.appendChild(div);
+            });
+        }
+
+        function disableConfirmedItems(data) {
+            document.querySelectorAll('.image-item.disabled').forEach(el => {
+                el.classList.remove('disabled');
+                const box = el.querySelector('input');
+                if (box) { box.disabled = false; box.checked = false; box.style.visibility = 'visible'; }
+            });
+            const confirmedUrls = new Set();
+            Object.values(data).forEach(userGroups => {
+                Object.values(userGroups).forEach(groupItems => {
+                    groupItems.forEach(item => confirmedUrls.add(item.url));
+                });
+            });
+            confirmedUrls.forEach(url => {
+                const box = document.querySelector(`input[data-image-url="${url}"]`);
+                if (box) {
+                    box.checked = false;
+                    box.disabled = true;
+                    box.style.visibility = 'hidden';
+                    box.parentElement.classList.add('disabled');
+                }
+            });
+        }
+
+        // [v24] 전체 내역 + 재입고여부 다운로드 함수
+        function downloadFullData() {
+            if (!window.parsedCustomerData || Object.keys(window.parsedCustomerData).length === 0) {
+                alert("데이터가 로드되지 않았습니다.");
+                return;
+            }
+
+            // 1. DB에서 재입고된 URL 목록 추출 (빠른 조회를 위해 Set 사용)
+            const confirmedUrls = new Set();
+            if (window.firebaseData) {
+                Object.values(window.firebaseData).forEach(userGroups => {
+                    Object.values(userGroups).forEach(groupItems => {
+                        groupItems.forEach(item => confirmedUrls.add(item.url));
+                    });
+                });
+            }
+
+            // 2. CSV 헤더 생성 (원본 헤더 + 재입고여부)
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            // 원본 헤더가 있다면 사용, 없으면 기본값
+            if (window.csvHeaders && window.csvHeaders.length > 0) {
+                csvContent += window.csvHeaders.join(",") + ",재입고여부\n";
+            } else {
+                csvContent += "userCardNo,real_collection_date,category,img_url,재입고여부\n";
+            }
+
+            // 3. 전체 데이터 순회하며 CSV 생성
+            const sortedUsers = Object.keys(window.parsedCustomerData).sort(); // 가나다순 (전체)
+            
+            sortedUsers.forEach(user => {
+                const items = window.parsedCustomerData[user];
+                items.forEach(item => {
+                    // 재입고 여부 확인
+                    const isReordered = confirmedUrls.has(item.url) ? "O" : "X";
+                    
+                    // 원본 데이터 행 사용 (CSV 형식 유지를 위해 따옴표 처리)
+                    let rowString = "";
+                    if (item.fullData && item.fullData.length > 0) {
+                        // 원본 데이터가 있으면 그대로 사용 + 재입고여부
+                        const quotedData = item.fullData.map(field => {
+                            // 이미 따옴표가 있으면 처리 필요하지만, 간단히 쉼표 포함 시 감싸기 처리
+                            if (field.includes(',') || field.includes('"')) {
+                                return `"${field.replace(/"/g, '""')}"`;
+                            }
+                            return field;
+                        });
+                        rowString = quotedData.join(",") + "," + isReordered;
+                    } else {
+                        // fallback
+                        rowString = `${user},${item.date},${item.category},${item.url},${isReordered}`;
+                    }
+                    
+                    csvContent += rowString + "\n";
+                });
+            });
+
+            // 4. 다운로드 실행
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            
+            const now = new Date();
+            const timeStr = now.toISOString().slice(0,19).replace(/:/g,"");
+            link.setAttribute("download", `전체내역_재입고포함_${timeStr}.csv`);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
