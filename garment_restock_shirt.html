@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>세탁물 재입고 확인 도구 (v24 - 전체내역 다운로드)</title>
+    <title>세탁물 재입고 확인 도구 (v25 - 날짜추가)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
         h1, h2, h3, h4 { color: #333; }
@@ -34,8 +34,7 @@
         #apply-range-btn:hover { background-color: #138496; }
         #download-btn { background-color: #28a745; margin-left: auto; }
         #download-btn:hover { background-color: #218838; }
-        #reset-btn { background-color: #dc3545; }
-        #reset-btn:hover { background-color: #c82333; }
+        /* 초기화 버튼 스타일 삭제됨 */
         #file-input { font-size: 14px; }
 
         /* 플로팅 확인 버튼 컨테이너 */
@@ -123,7 +122,7 @@
 </head>
 <body>
 
-    <h1>세탁물 재입고 확인 도구 (v24)</h1>
+    <h1>세탁물 재입고 확인 도구 (v25)</h1>
     <p>파일 로드 시 <strong>인코딩</strong>을 확인하세요. <strong>[전체 내역 다운로드]</strong> 시 재입고 여부(O/X)가 포함됩니다.</p>
 
     <div id="controls">
@@ -147,8 +146,7 @@
         <div class="divider"></div>
 
         <button id="download-btn">💾 전체 내역 다운로드 (O/X 포함)</button>
-        <button id="reset-btn">🗑️ DB 초기화</button>
-    </div>
+        </div>
 
     <div id="floating-confirm-container">
         <button id="confirm-button">✔ 선택한 이미지 재입고 확인 (저장)</button>
@@ -220,12 +218,12 @@
         window.firebaseData = {}; 
         window.parsedCustomerData = {}; 
         window.sortedUserKeys = [];
-        window.csvHeaders = []; // [v24] 원본 CSV 헤더 저장용
+        window.csvHeaders = []; 
 
         // DOM 요소
         const confirmButton = document.getElementById('confirm-button');
         const downloadButton = document.getElementById('download-btn');
-        const resetButton = document.getElementById('reset-btn');
+        // 초기화 버튼 변수 삭제됨
         const applyRangeButton = document.getElementById('apply-range-btn');
         const fileInput = document.getElementById('file-input');
         const encodingSelect = document.getElementById('encoding-select');
@@ -248,15 +246,8 @@
             if(window.firebaseData) renderRightPanel(window.firebaseData);
         });
         
-        resetButton.onclick = function() {
-            if (confirm("정말로 DB를 초기화하시겠습니까? 모든 작업 내역이 삭제됩니다.")) {
-                remove(ref(db, CONFIRMED_NODE))
-                    .then(() => alert("DB 초기화 완료"))
-                    .catch((e) => alert("오류: " + e.message));
-            }
-        };
+        // 초기화 버튼 이벤트 리스너 삭제됨
 
-        // [v24] 다운로드 버튼 핸들러 연결
         downloadButton.onclick = () => downloadFullData();
 
         // 체크박스 변경 시 플로팅 버튼 제어
@@ -302,7 +293,6 @@
             window.csvHeaders = [];
 
             const lines = csvText.trim().split('\n');
-            // [v24] 원본 헤더 저장
             const headers = lines[0].split(',').map(h => h.trim());
             window.csvHeaders = headers;
             
@@ -320,7 +310,6 @@
 
             for (let i = 1; i < lines.length; i++) {
                 const rowStr = lines[i];
-                // 쉼표 분리 (따옴표 처리 등 복잡한 CSV는 아니라고 가정)
                 const values = rowStr.split(',');
                 
                 if (values.length <= Math.max(userIndex, dateIndex, urlIndex, categoryIndex)) continue; 
@@ -341,13 +330,11 @@
                 window.grandTotalItems++;
                 
                 if (!window.parsedCustomerData[user]) window.parsedCustomerData[user] = []; 
-                // [v24] 원본 Row 전체를 함께 저장 (다운로드용)
-                // CSV 생성 시 쉼표 문제를 피하기 위해 따옴표 처리 등을 직접 하기 위해 원본 배열 저장
                 window.parsedCustomerData[user].push({ 
                     url: url, 
                     category: category, 
                     date: date,
-                    fullData: values // 전체 컬럼 데이터
+                    fullData: values 
                 }); 
             }
 
@@ -426,7 +413,8 @@
                     
                     const categoryText = document.createElement('span');
                     categoryText.className = 'category-text';
-                    categoryText.textContent = item.category;
+                    // [v25 수정됨] 날짜 추가
+                    categoryText.textContent = `${item.category} (${item.date})`;
                     
                     imageItem.appendChild(checkbox);
                     imageItem.appendChild(img);
@@ -615,14 +603,13 @@
             });
         }
 
-        // [v24] 전체 내역 + 재입고여부 다운로드 함수
+        // 전체 내역 다운로드 함수
         function downloadFullData() {
             if (!window.parsedCustomerData || Object.keys(window.parsedCustomerData).length === 0) {
                 alert("데이터가 로드되지 않았습니다.");
                 return;
             }
 
-            // 1. DB에서 재입고된 URL 목록 추출 (빠른 조회를 위해 Set 사용)
             const confirmedUrls = new Set();
             if (window.firebaseData) {
                 Object.values(window.firebaseData).forEach(userGroups => {
@@ -632,30 +619,23 @@
                 });
             }
 
-            // 2. CSV 헤더 생성 (원본 헤더 + 재입고여부)
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            // 원본 헤더가 있다면 사용, 없으면 기본값
             if (window.csvHeaders && window.csvHeaders.length > 0) {
                 csvContent += window.csvHeaders.join(",") + ",재입고여부\n";
             } else {
                 csvContent += "userCardNo,real_collection_date,category,img_url,재입고여부\n";
             }
 
-            // 3. 전체 데이터 순회하며 CSV 생성
-            const sortedUsers = Object.keys(window.parsedCustomerData).sort(); // 가나다순 (전체)
+            const sortedUsers = Object.keys(window.parsedCustomerData).sort(); 
             
             sortedUsers.forEach(user => {
                 const items = window.parsedCustomerData[user];
                 items.forEach(item => {
-                    // 재입고 여부 확인
                     const isReordered = confirmedUrls.has(item.url) ? "O" : "X";
                     
-                    // 원본 데이터 행 사용 (CSV 형식 유지를 위해 따옴표 처리)
                     let rowString = "";
                     if (item.fullData && item.fullData.length > 0) {
-                        // 원본 데이터가 있으면 그대로 사용 + 재입고여부
                         const quotedData = item.fullData.map(field => {
-                            // 이미 따옴표가 있으면 처리 필요하지만, 간단히 쉼표 포함 시 감싸기 처리
                             if (field.includes(',') || field.includes('"')) {
                                 return `"${field.replace(/"/g, '""')}"`;
                             }
@@ -663,7 +643,6 @@
                         });
                         rowString = quotedData.join(",") + "," + isReordered;
                     } else {
-                        // fallback
                         rowString = `${user},${item.date},${item.category},${item.url},${isReordered}`;
                     }
                     
@@ -671,7 +650,6 @@
                 });
             });
 
-            // 4. 다운로드 실행
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
