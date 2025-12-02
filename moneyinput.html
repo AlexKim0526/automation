@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고객 정산 내역 확인</title>
+    <style>
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: white;
+            width: 100%;
+            max-width: 480px;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 25px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box; /* 패딩 포함 크기 계산 */
+        }
+        button.search-btn {
+            width: 100%;
+            padding: 14px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button.search-btn:hover {
+            background-color: #0056b3;
+        }
+        
+        /* 결과 화면 스타일 */
+        #resultArea {
+            display: none; /* 기본 숨김 */
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .info-label { color: #666; }
+        .info-value { font-weight: bold; color: #333; }
+        .amount-value { color: #e53935; font-size: 18px; }
+
+        .receipt-box {
+            margin: 20px 0;
+            text-align: center;
+            border: 1px dashed #ccc;
+            padding: 10px;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .receipt-box img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        .receipt-label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-confirm {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-edit {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .error-msg {
+            color: red;
+            text-align: center;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>정산 내역 조회</h2>
+    
+    <div class="input-group">
+        <label for="birthInput">주민등록번호 앞자리 (6자리)</label>
+        <input type="text" id="birthInput" placeholder="예: 800101" maxlength="6">
+    </div>
+    <button class="search-btn" onclick="searchData()">내역 확인하기</button>
+    <p class="error-msg" id="errorMsg">일치하는 정보를 찾을 수 없습니다.</p>
+
+    <div id="resultArea">
+        <div class="info-row">
+            <span class="info-label">이름</span>
+            <span class="info-value" id="resName"></span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">청구 금액(실비)</span>
+            <span class="info-value amount-value" id="resAmount"></span>
+        </div>
+
+        <div class="receipt-box">
+            <span class="receipt-label">영수증 이미지</span>
+            <img id="resImg" src="" alt="영수증 없음">
+        </div>
+
+        <div class="btn-group">
+            <button class="action-btn btn-confirm" onclick="sendEmail('confirm')">확인완료</button>
+            <button class="action-btn btn-edit" onclick="sendEmail('edit')">수정요청</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. 고객 데이터 (이곳에 엑셀 데이터를 추가하세요)
+    const customerData = [
+        // 샘플 데이터 (파일 내용을 기반으로 작성됨)
+        { name: "이여용", birth: "700522", amount: "90420", image: "https://cdn.imweb.me/upload/S20230713ff43232050963/9e782622956f4.png" },
+        
+        // 여기에 다른 고객 데이터를 계속 추가하면 됩니다.
+    ];
+
+    let currentData = null; // 현재 조회된 고객 정보 저장
+
+    // 2. 검색 기능
+    function searchData() {
+        const input = document.getElementById('birthInput').value.trim();
+        const errorMsg = document.getElementById('errorMsg');
+        const resultArea = document.getElementById('resultArea');
+
+        // 입력값 검증
+        if (input.length !== 6) {
+            alert("주민번호 앞자리 6자리를 정확히 입력해주세요.");
+            return;
+        }
+
+        // 데이터 찾기
+        const found = customerData.find(person => person.birth === input);
+
+        if (found) {
+            currentData = found;
+            errorMsg.style.display = 'none';
+            resultArea.style.display = 'block';
+
+            // 화면에 뿌리기
+            document.getElementById('resName').textContent = found.name;
+            document.getElementById('resAmount').textContent = Number(found.amount).toLocaleString() + '원';
+            
+            const imgEl = document.getElementById('resImg');
+            if(found.image && found.image.trim() !== "") {
+                imgEl.src = found.image;
+                imgEl.style.display = 'inline-block';
+            } else {
+                imgEl.style.display = 'none';
+            }
+        } else {
+            currentData = null;
+            resultArea.style.display = 'none';
+            errorMsg.style.display = 'block';
+        }
+    }
+
+    // 3. 이메일 발송 기능
+    function sendEmail(type) {
+        if (!currentData) return;
+
+        const adminEmail = "justdong12@gmail.com";
+        let subject = "";
+        let body = "";
+
+        if (type === 'confirm') {
+            subject = `[정산확인] ${currentData.name}님 정산 내역 확인 완료`;
+            body = `안녕하세요.\n\n아래 정산 내역을 확인하였으며, 이상 없음을 알려드립니다.\n\n- 성함: ${currentData.name}\n- 주민번호(앞자리): ${currentData.birth}\n- 확인 금액: ${Number(currentData.amount).toLocaleString()}원\n\n감사합니다.`;
+        } else {
+            subject = `[수정요청] ${currentData.name}님 정산 내역 수정 요청`;
+            body = `안녕하세요.\n\n정산 내역에 수정이 필요하여 요청드립니다.\n\n- 성함: ${currentData.name}\n- 주민번호(앞자리): ${currentData.birth}\n\n[수정 요청 내용]:\n(이곳에 수정이 필요한 내용을 적어주세요)\n\n`;
+        }
+
+        // 메일 클라이언트 열기
+        window.location.href = `mailto:${adminEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
+</script>
+
+</body>
+</html>
