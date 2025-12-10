@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세탁물 재입고 확인 도구</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f7f6;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        #controls {
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #file-input {
+            font-size: 16px;
+        }
+        .customer-section {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            overflow: hidden;
+        }
+        .customer-header {
+            background-color: #e9ecef;
+            padding: 10px 20px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .date-section {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .date-section:last-child {
+            border-bottom: none;
+        }
+        .date-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .image-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .image-item img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .image-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+        }
+        #confirmed-pairs {
+            margin-top: 20px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #confirmed-pairs h3 {
+            margin-top: 0;
+        }
+        #confirmed-pairs ul {
+            padding-left: 20px;
+        }
+        #confirmed-pairs li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #confirmed-pairs img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>세탁물 재입고 확인 도구</h1>
+    <p>이전에 생성한 <strong>customer_date_url_list.csv</strong> 파일을 업로드하세요.</p>
+
+    <div id="controls">
+        <input type="file" id="file-input" accept=".csv">
+        <button id="confirm-button">선택한 2개 이미지 재입고 확인</button>
+    </div>
+
+    <div id="confirmed-pairs">
+        <h3>확인된 재입고 쌍</h3>
+        <ul id="confirmed-list">
+            </ul>
+    </div>
+
+    <div id="content">
+        </div>
+
+    <script>
+        document.getElementById('file-input').addEventListener('change', handleFileSelect);
+        document.getElementById('confirm-button').addEventListener('click', confirmReorder);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const text = e.target.result;
+                processData(text);
+            };
+            
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function processData(csvText) {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = ""; // 이전 내용 지우기
+            
+            const lines = csvText.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            
+            // CSV 헤더에서 컬럼 인덱스 찾기
+            const userIndex = headers.indexOf("userCardNo");
+            const dateIndex = headers.indexOf("real_collection_date");
+            const urlListIndex = headers.indexOf("이미지URL_리스트");
+
+            if (userIndex === -1 || dateIndex === -1 || urlListIndex === -1) {
+                alert("CSV 파일 형식이 올바르지 않습니다.\n필수 컬럼: userCardNo, real_collection_date, 이미지URL_리스트");
+                return;
+            }
+
+            const customerData = {};
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(','); // 간단한 CSV 파싱
+                
+                // 참고: 이 파싱은 URL 리스트 내에 쉼표가 없다고 가정합니다.
+                // CSV가 복잡하다면(예: 따옴표 안의 쉼표) 라이브러리가 필요합니다.
+                // 하지만 우리가 생성한 CSV는 이 방식이 작동합니다.
+                
+                const user = values[userIndex];
+                const date = values[dateIndex];
+                
+                // 이미지 URL 리스트 파싱 (예: "['url1', 'url2']")
+                const urlsString = values.slice(urlListIndex).join(','); // 행의 나머지 부분 합치기
+                const urls = urlsString
+                    .slice(1, -1) // 양쪽 대괄호 제거 "['url1', 'url2']" -> "'url1', 'url2'"
+                    .split("', '") // ", " 로 분리
+                    .map(url => url.replace(/'/g, "")); // 작은따옴표 제거
+
+                if (!customerData[user]) {
+                    customerData[user] = [];
+                }
+                
+                customerData[user].push({ date, urls });
+            }
+
+            displayData(customerData);
+        }
+
+        function displayData(customerData) {
+            const contentDiv = document.getElementById('content');
+            
+            for (const user in customerData) {
+                const customerSection = document.createElement('div');
+                customerSection.className = 'customer-section';
+                
+                const customerHeader = document.createElement('div');
+                customerHeader.className = 'customer-header';
+                customerHeader.textContent = `고객 ID: ${user}`;
+                customerSection.appendChild(customerHeader);
+                
+                customerData[user].forEach(item => {
+                    const dateSection = document.createElement('div');
+                    dateSection.className = 'date-section';
+                    
+                    const dateHeader = document.createElement('h3');
+                    dateHeader.className = 'date-header';
+                    dateHeader.textContent = `세탁일: ${item.date}`;
+                    dateSection.appendChild(dateHeader);
+                    
+                    const imageContainer = document.createElement('div');
+                    imageContainer.className = 'image-container';
+                    
+                    item.urls.forEach(url => {
+                        const imageItem = document.createElement('div');
+                        imageItem.className = 'image-item';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.dataset.imageUrl = url; // 이미지 URL을 데이터로 저장
+                        
+                        const img = document.createElement('img');
+                        img.src = url;
+                        img.alt = '세탁물 이미지';
+                        // 이미지 로드 실패 시
+                        img.onerror = () => { img.src = 'https://via.placeholder.com/150?text=Image+Not+Found'; };
+                        
+                        imageItem.appendChild(checkbox);
+                        imageItem.appendChild(img);
+                        imageContainer.appendChild(imageItem);
+                    });
+                    
+                    dateSection.appendChild(imageContainer);
+                    customerSection.appendChild(dateSection);
+                });
+                
+                contentDiv.appendChild(customerSection);
+            }
+        }
+
+        function confirmReorder() {
+            const checkedBoxes = document.querySelectorAll('input[type="checkbox"]:checked');
+            
+            if (checkedBoxes.length !== 2) {
+                alert("재입고 확인을 위해 정확히 2개의 이미지를 선택해야 합니다.");
+                return;
+            }
+
+            const confirmedList = document.getElementById('confirmed-list');
+            const li = document.createElement('li');
+            
+            const img1 = document.createElement('img');
+            img1.src = checkedBoxes[0].dataset.imageUrl;
+            
+            const img2 = document.createElement('img');
+            img2.src = checkedBoxes[1].dataset.imageUrl;
+            
+            const text = document.createTextNode(' 두 이미지가 재입고 항목으로 확인되었습니다.');
+            
+            li.appendChild(img1);
+            li.appendChild(document.createTextNode(' + '));
+            li.appendChild(img2);
+            li.appendChild(text);
+            
+            confirmedList.appendChild(li);
+            
+            // 확인 후 체크박스 해제
+            checkedBoxes.forEach(box => box.checked = false);
+        }
+    </script>
+
+</body>
+</html>
